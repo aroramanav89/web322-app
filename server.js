@@ -1,5 +1,5 @@
 /*********************************************************************************
- *  WEB322 – Assignment 02
+ *  WEB322 – Assignment 03
  *  I declare that this assignment is my own work in accordance with Seneca  Academic Policy.  No part *  of this assignment has been copied manually or electronically from any other source
  *  (including 3rd party web sites) or distributed to other students.
  *
@@ -8,16 +8,7 @@
  *  Online (Cyclic) Link: https://splendid-yak-onesies.cyclic.app/
  *
  ********************************************************************************/
- /*********************************************************************************
- *  WEB322 – Assignment 03
- *  I declare that this assignment is my own work in accordance with Seneca  Academic Policy.  No part *  of this assignment has been copied manually or electronically from any other source
- *  (including 3rd party web sites) or distributed to other students.
- *
- *  Name:Sajanpreet Singh Student ID:156373219 Date: 16 October,2022
- *
- *  Online (Cyclic) Link: https://apricot-raven-shoe.cyclic.app
- *
- ********************************************************************************/
+ 
   var express = require("express");
   var app = express();
   var path = require("path");
