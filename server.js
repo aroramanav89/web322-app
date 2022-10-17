@@ -27,9 +27,9 @@
   const upload = multer(); // no { storage: storage }
   
   cloudinary.config({
-    cloud_name: 'dpbkh43py',
-    api_key: '947541149322694',
-    api_secret: 'BNnhzqn4VuzYdbZQnjz9AzOcMCc',
+    cloud_name: 'dh5oo7rk5',
+    api_key: '648259183232712',
+    api_secret: 'W56RcbmRTC6csy7K-96z4lRZYUQc',
         secure: true,
     });
   
