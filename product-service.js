@@ -13,158 +13,178 @@ var sequelize = new Sequelize('imgsyngx'
 });
 
 //creating models
-var Product=sequelize.define('Product',{
-    body:Sequelize.TEXT,
-    title:Sequelize.STRING,
-    postDate:Sequelize.DATE,
-    featureImage:Sequelize.STRING,
-    published:Sequelize.BOOLEAN
-});
-
-var Category=sequelize.define('Category',{
-    category:Sequelize.STRING
-})
-
-
-
-module.exports.getAllProducts =()=> {
+const Product = sequelize.define("Product", {
+    body: Sequelize.TEXT,
+    title: Sequelize.STRING,
+    postDate: Sequelize.DATE,
+    featureImage: Sequelize.STRING,
+    published: Sequelize.BOOLEAN,
+  });
+  
+  const Category = sequelize.define("Category", {
+    category: Sequelize.STRING,
+  });
+  
+  Product.belongsTo(Category, { foreignKey: "category" });
+  
+  //initializing modules
+  module.exports.initialize = function () {
     return new Promise((resolve, reject) => {
-        sequelize.sync()
+      sequelize
+        .sync()
+        .then(resolve("database synced"))
+        .catch(reject("unable to sync the database"));
+    });
+  };
+  
+  //getAllproducts() function
+  module.exports.getAllProducts = function () {
+    return new Promise((resolve, reject) => {
+      sequelize
+        .sync()
         .then(resolve(Product.findAll()))
-        .catch(reject('no results returned'))
-    })
-};
-
-module.exports.getProductsByCategory = (category)=>{
+        .catch(reject("no results returned"));
+    });
+  };
+  
+  //function to add a new product
+  module.exports.addProduct = (productData) => {
     return new Promise((resolve, reject) => {
-       Product.findAll({
-        where:{
-            category:category
+      productData.published = productData.published ? true : false;
+      for (var i in productData) {
+        if (productData[i] == "") {
+          productData[i] = null;
         }
-       })
-       .then(data=>resolve(data))
-       .catch(err=>reject(err))
-    })
-};
-
-module.exports.getProductsByMinDate = (minDateStr)=> {
-    return new Promise((resolve, reject) => {
-        const { gte } = Sequelize.Op;
-
-        Product.findAll({
-            where: {
-        postDate: {
-            [gte]: new Date(minDateStr)
-            }
-            }
-        })
-        .then(data=>resolve(data))
-        .catch(err=>reject(err))
-    })
-};
-//model realtionship
-Product.belongsTo(Category, {foreignKey: 'category'});
-
-module.exports.initialize = () => {
-    return new Promise((resolve,reject) => {
-        sequelize.sync()
-        .then(resolve('database synced'))
-        .catch(reject('unable to sync the database'));
-    })
-};
-module.exports.getProductById = (id)=>{
-    return new Promise((resolve, reject) => {
-        Product.findAll({
-            where:{
-                id:id
-            }
-        })
-        .then(data=>resolve(data[0]))///check for error
-        .catch(err=>reject(err))
-    })
-};
-
-module.exports.addProduct = (productData)=>{
-    return new Promise((resolve, reject) => {
-        productData.published = (productData.published) ? true : false;
-        for(var i in productData){
-            if(productData[i]==""){productData[i]=null;}
-        }
-        postDate:new Date();// check for error
-
-        Product.create(productData)
+      }
+      Product.create(productData)
         .then(resolve(Product.findAll()))
-        .catch(reject('unable to create product'))
-    })
-};
-
-
-
-module.exports.getPublishedProductsByCategory= (category)=>{
+        .catch(reject("unable to create product"));
+    });
+  };
+  
+  module.exports.addCategory = (categoryData) => {
     return new Promise((resolve, reject) => {
-        Product.findAll({
-            where:{
-                published:true,
-                category:category
-            }
-        })
-        .then(data=>resolve(data))
-        .catch(err=>reject(err))
-    })
-};
-
-module.exports.getCategories = function(){
-    return new Promise((resolve, reject) => {
-        Category.findAll()
-        .then(data=>resolve(data))
-        .catch(err=>reject(err))
-    })
-};
-module.exports.getPublishedProducts = ()=>{
-  return new Promise((resolve, reject) => {
-      Product.findAll({
-          where:{
-              published:true
-          }
-      })
-      .then(data=>resolve(data))
-      .catch(err=>reject(err))
-  })
-};
-module.exports.addCategory = (categoryData)=>{
-    return new Promise((resolve, reject) => {
-        categoryData.published = (categoryData.published) ? true : false;
-        for(var i in categoryData){
-            if(categoryData[i]==""){categoryData[i]=null;}
+      for (var y in categoryData) {
+        if (categoryData[y] == "") {
+          categoryData[y] = null;
         }
-        postDate:new Date();// check for error
-
-        Category.create(categoryData)
+      }
+      Category.create(categoryData)
         .then(resolve(Category.findAll()))
-        .catch(reject('unable to create category'))
-    })
-};
-
-module.exports.deleteCategoryById=(id)=>{
-    return new Promise((resolve,reject)=>{
-        Category.destroy({
-            where:{
-                id:id
-            }
+        .catch(reject("unable to create category"));
+    });
+  };
+  
+  //getPublishedProducts() function validates only published products
+  module.exports.getPublishedProducts = function () {
+    return new Promise((resolve, reject) => {
+      Product.findAll({
+        where: {
+          published: true,
+        },
+      })
+        .then(resolve(Product.findAll({ where: { published: true } })))
+        .catch("no results returned");
+    });
+  };
+  
+  //getPublishedProductsByCategory() function validates only published products by category
+  module.exports.getPublishedProductsByCategory = (category) => {
+    return new Promise((resolve, reject) => {
+      Product.findAll({
+        where: {
+          published: true,
+        },
+      })
+        .then(resolve(Product.findAll({ where: { category: category } })))
+        .catch("no results returned");
+    });
+  };
+  
+  //getCategories() function
+  module.exports.getCategories = function () {
+    return new Promise((resolve, reject) => {
+      Category.findAll()
+        .then((data) => {
+          resolve(data);
         })
-        .then(resolve())
-        .catch(err=>reject(err))
-    })
-};
-
-module.exports.deleteProductById=(id)=>{
-    return new Promise((resolve,reject)=>{
-        Product.destroy({
-            where:{
-                id:id
-            }
+        .catch((err) => {
+          reject(err);
+        });
+    });
+  };
+  
+  //get product by categories
+  module.exports.getProductByCategory = (category) => {
+    return new Promise((resolve, reject) => {
+      Product.findAll({
+        where: {
+          category: category,
+        },
+      })
+        .then((data) => resolve(data))
+        .catch("no results returned");
+    });
+  };
+  
+  //get products by min date
+  module.exports.getProductsByMinDate = (minDate) => {
+    return new Promise((resolve, reject) => {
+      const { gte } = Sequelize.Op;
+      Product.findAll({
+        where: {
+          postDate: {
+            [gte]: new Date(minDate),
+          },
+        },
+      })
+        .then((data) => resolve(data))
+        .catch("no results returned");
+    });
+  };
+  
+  //function to get id
+  module.exports.getProductById = (id) => {
+    return new Promise((resolve, reject) => {
+      Product.findAll({
+        where: {
+          id: id,
+        },
+      })
+        .then(resolve(Product.findAll({ where: { id: id } })))
+        .catch(reject("no results returned"));
+    });
+  };
+  
+  module.exports.deleteCategoryById = function (id) {
+    return new Promise(function (resolve, reject) {
+      Category.destroy({
+        where: {
+          id: id,
+        },
+      })
+        .then(function () {
+          resolve();
         })
-        .then(resolve())
-        .catch(err=>reject(err))
-    })
-}
+        .catch((err) => {
+          reject("was rejected");
+        });
+    });
+  };
+  
+  module.exports.deleteProductById = (id) => {
+    return new Promise(function (resolve, reject) {
+      sequelize
+        .sync()
+        .then(() => {
+          resolve(
+            Product.destroy({
+              where: { id: id },
+            })
+          );
+        })
+        .catch((err) => {
+          reject();
+        });
+    });
+  };

@@ -1,14 +1,4 @@
-/*********************************************************************************
- *  WEB322 – Assignment 04
- *  I declare that this assignment is my own work in accordance with Seneca  Academic Policy.  No part *  of this assignment has been copied manually or electronically from any other source
- *  (including 3rd party web sites) or distributed to other students.
- *
- *  Name: manav Student ID:153341219 Date: 6 November 2022
- *
- *  Online (Cyclic) Link: https://splendid-yak-onesies.cyclic.app/
- *
- *******************************************************************************/
- var express = require("express");
+var express = require("express");
 var app = express();
 var path = require("path");
 const multer = require("multer");
@@ -19,11 +9,11 @@ const exphbs = require("express-handlebars");
 const stripJs = require("strip-js");
 
 cloudinary.config({
-    cloud_name: 'dh5oo7rk5',
-    api_key: '648259183232712',
-    api_secret: 'W56RcbmRTC6csy7K-96z4lRZYUQc',
-        secure: true,
-    });
+  cloud_name: 'dh5oo7rk5',
+  api_key: '648259183232712',
+  api_secret: 'W56RcbmRTC6csy7K-96z4lRZYUQc',
+      secure: true,
+  });
 
 app.engine(
   ".hbs",
@@ -68,7 +58,6 @@ app.set("view engine", ".hbs");
 //adding path tp product-service.js module to interact with it
 var productSrv = require("./product-service");
 const { get } = require("http");
-const { resolve } = require("path");
 
 var HTTP_PORT = process.env.PORT || 8080;
 
@@ -98,7 +87,6 @@ app.use(function (req, res, next) {
 });
 
 app.use(express.static("public"));
-app.use(express.urlencoded({extended: true}));
 
 //setting up a defualt route for local host
 app.get("/", function (req, res) {
@@ -110,17 +98,14 @@ app.get("/home", function (req, res) {
 });
 
 app.get("/products/add", function (req, res) {
-  res.render(path.join(__dirname + "/views/addProduct.hbs"));
+  productSrv
+    .getCategories()
+    .then((data) => res.render("addProduct", { categories: data }))
+    .catch((err) => res.render("addProduct", { categories: [] }));
 });
-//
-app.get("/categories/add",function(req,res){
+
+app.get("/categories/add", function (req, res) {
   res.render(path.join(__dirname + "/views/addCategory.hbs"));
-});
-//
-app.post("/categories/add",function(req,res){
-  productSrv.addCategory(req.body).then(() => {
-    res.redirect("/categories"); //after done redirect to demos
-  });
 });
 
 //add image cloudinary code
@@ -151,16 +136,30 @@ app.post("/products/add", upload.single("featureImage"), function (req, res) {
   productSrv.addProduct(req.body).then(() => {
     res.redirect("/demos"); //after done redirect to demos
   });
+});
 
-  return new Promise((resolve,reject)=>{
-    productSrv.getCategories()
-    .then(function(data){
-      res.render("addProduct", {categories: data});
-    })
-    .catch(function(err){
-      res.render("addProduct", {categories: []});
-    })
+app.post("/categories/add", (req, res) => {
+  productSrv.addCategory(req.body).then(() => {
+    res.redirect("/categories");
   });
+});
+
+app.get("/categories/delete/:id", (req, res) => {
+  productSrv
+    .deleteCategoryById(req.params.id)
+    .then(res.redirect("/categories"))
+    .catch((err) =>
+      res.status(500).send("Unable to Remove Category / Category not found")
+    );
+});
+
+app.get("/demos/delete/:id", (req, res) => {
+  productSrv
+    .deleteProductById(req.params.id)
+    .then(res.redirect("/demos"))
+    .catch((err) =>
+      res.status(500).send("Unable to Remove Product / Product not found")
+    );
 });
 
 app.get("/product", async (req, res) => {
@@ -276,19 +275,19 @@ app.get("/demos", (req, res) => {
     productSrv
       .getProductByCategory(req.query.category)
       .then((data) => {
-        res.render("demos", { demos: data });
+        res.render("demos", { products: data });
       })
       .catch((err) => {
-        res.render({ message: "no results" });
+        res.render("demos", { message: "no results" });
       });
   } else {
     productSrv
       .getAllProducts()
       .then((data) => {
-        res.render("demos", { demos: data });
+        res.render("demos", { products: data });
       })
       .catch(function (err) {
-        res.render({ message: err });
+        res.render("demos", { message: "no results" });
       });
   }
 });
@@ -298,10 +297,10 @@ app.get("/categories", function (req, res) {
     productSrv
       .getProductByCategory(req.query.category)
       .then((data) => {
-        res.render("demos", { demos: data });
+        res.render("categories", { categories: data });
       })
       .catch((err) => {
-        res.render({ message: "no results" });
+        res.render("categories", { message: "no results" });
       });
   } else {
     productSrv
@@ -327,33 +326,11 @@ app.get("/product/:value", function (req, res) {
     });
 });
 
-app.get("/categories/delete/:id",function(req,res){
-    productSrv
-    .deleteCategoryById(id)
-    .then(function(data){
-      res.redirect("/categories");
-    })
-    .catch(function(err){
-      res.status(500);
-      console.log("Unable to Remove Category / Category not found");
-    });
-});
-
-app.get("/demos/delete/:id",function(req,res){
-  productSrv
-    .deleteProductById(id) 
-    .then(function(data){
-      res.redirect("/demos");
-    })
-    .catch(function(err){
-      res.status(500);
-      console.log("Unable to Remove Category / Category not found");
-    });
-});
-
 //if no route found show Page Not Found
 app.use(function (req, res) {
   res.status(404).render(path.join(__dirname, "/views/404.hbs"));
 });
+
+app.use(express.urlencoded({ extended: true }));
 
 app.listen(HTTP_PORT, onHttpStart);
