@@ -8,46 +8,15 @@
  *  Online (Cyclic) Link: https://splendid-yak-onesies.cyclic.app/
  *
  *******************************************************************************/
- const HTTP_PORT = process.env.PORT || 8080;
-
-const express = require('express');
-const path = require("path");
+ var express = require("express");
+var app = express();
+var path = require("path");
 const multer = require("multer");
-const fs = require('fs');
-const productData = require("./product-service.js");
-const cloudinary = require('cloudinary').v2;
-const streamifier = require('streamifier');
-const exphbs = require('express-handlebars');
-const app = express();
-const stripJs = require('strip-js');
-
-app.engine('.hbs', exphbs({ 
-    extname: ".hbs", 
-    defaultLayout: "main",
-    helpers: {
-        navLink: function(url, options){
-            return '<li' + 
-                ((url == app.locals.activeRoute) ? ' class="active" ' : '') + 
-        '><a href="' + url + '">' + options.fn(this) + '</a></li>';},
-        equal: function (lvalue, rvalue, options) {
-            if (arguments.length< 3)
-                throw new Error("Handlebars Helper equal needs 2 parameters");
-            if (lvalue != rvalue) {
-                return options.inverse(this);
-            } else {
-                return options.fn(this);
-            }
-        },  
-        safeHTML: function(context){
-            return stripJs(context);
-        }
-         
-    }
-}));
-
-app.set('view engine', '.hbs');
-
-
+const cloudinary = require("cloudinary").v2;
+const streamifier = require("streamifier");
+const upload = multer(); // no { storage: storage }
+const exphbs = require("express-handlebars");
+const stripJs = require("strip-js");
 
 cloudinary.config({
     cloud_name: 'dh5oo7rk5',
@@ -56,217 +25,335 @@ cloudinary.config({
         secure: true,
     });
 
-const upload = multer();
-
-app.use(express.static('public'));
-
-app.use(function(req,res,next){
-    let route = req.path.substring(1);
-app.locals.activeRoute = "/" + (isNaN(route.split('/')[1]) ?route.replace(/\/(?!.*)/, "") :route.replace(/\/(.*)/, ""));
-app.locals.viewingCategory = req.query.category;
-next();
-});
-
-
-
-app.get('/', (req, res) => {
-    res.render(path.join(__dirname, "/views/home.hbs"))
-});
-
-app.get('/product', async (req, res) => {
-
-    // Declare an object to store properties for the view
-    let viewData = {};
-
-    try{
-
-        // declare an empty array to hold "product" objects
-        let products = [];
-
-        // if there's a "category" query, filter the returned products by the category
-        if(req.query.category){
-            // Obtain the published "products" by category
-            products = await productData.getPublishedProductsByCategory(req.query.category);
-        }else{
-            // Obtain the published "products"
-            products = await productData.getPublishedProducts();
+app.engine(
+  ".hbs",
+  exphbs.engine({
+    extname: ".hbs",
+    defaultLayout: "main",
+    helpers: {
+      navLink: function (url, options) {
+        return (
+          "<li" +
+          (url == app.locals.activeRoute ? ' class="active" ' : "") +
+          '><a href="' +
+          url +
+          '">' +
+          options.fn(this) +
+          "</a></li>"
+        );
+      },
+      equal: function (lvalue, rvalue, options) {
+        if (arguments.length < 3)
+          throw new Error("Handlebars Helper equal needs 2 parameters");
+        if (lvalue != rvalue) {
+          return options.inverse(this);
+        } else {
+          return options.fn(this);
         }
+      },
+      safeHTML: function (context) {
+        return stripJs(context);
+      },
+      formatDate: function(dateObj){
+        let year = dateObj.getFullYear();
+        let month = (dateObj.getMonth() + 1).toString();
+        let day = dateObj.getDate().toString();
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2,'0')}`;
+    },
+    },
+  })
+);
+app.set("view engine", ".hbs");
 
-        // sort the published products by the postDate
-        products.sort((a,b) => new Date(b.postDate) - new Date(a.postDate));
+//adding path tp product-service.js module to interact with it
+var productSrv = require("./product-service");
+const { get } = require("http");
+const { resolve } = require("path");
 
-        // get the latest product from the front of the list (element 0)
-        let product = products[0]; 
+var HTTP_PORT = process.env.PORT || 8080;
 
-        // store the "products" and "product" data in the viewData object (to be passed to the view)
-        viewData.products = products;
-        viewData.product = product;
+function onHttpStart() {
+  console.log("Express http server listening on: " + HTTP_PORT);
+  return new Promise(function (res, req) {
+    productSrv
+      .initialize()
+      .then(function (data) {
+        console.log(data);
+      })
+      .catch(function (err) {
+        console.log(err);
+      });
+  });
+}
 
-    }catch(err){
-        viewData.message = "no results";
-    }
-
-    try{
-        // Obtain the full list of "categories"
-        let categories = await productData.getCategories();
-
-        // store the "categories" data in the viewData object (to be passed to the view)
-        viewData.categories = categories;
-    }catch(err){
-        viewData.categoriesMessage = "no results"
-    }
-
-    // render the "product" view with all of the data (viewData)
-    res.render("product", {data: viewData})
-
+app.use(function (req, res, next) {
+  let route = req.path.substring(1);
+  app.locals.activeRoute =
+    "/" +
+    (isNaN(route.split("/")[1])
+      ? route.replace(/\/(?!.*)/, "")
+      : route.replace(/\/(.*)/, ""));
+  app.locals.viewingCategory = req.query.category;
+  next();
 });
 
-app.get('/product/:id', async (req, res) => {
+app.use(express.static("public"));
+app.use(express.urlencoded({extended: true}));
 
-    // Declare an object to store properties for the view
-    let viewData = {};
+//setting up a defualt route for local host
+app.get("/", function (req, res) {
+  res.render(path.join(__dirname + "/views/home.hbs"));
+});
 
-    try{
+app.get("/home", function (req, res) {
+  res.render(path.join(__dirname + "/views/home.hbs"));
+});
 
-        // declare an empty array to hold "product" objects
-        let products = [];
+app.get("/products/add", function (req, res) {
+  res.render(path.join(__dirname + "/views/addProduct.hbs"));
+});
+//
+app.get("/categories/add",function(req,res){
+  res.render(path.join(__dirname + "/views/addCategory.hbs"));
+});
+//
+app.post("/categories/add",function(req,res){
+  productSrv.addCategory(req.body).then(() => {
+    res.redirect("/categories"); //after done redirect to demos
+  });
+});
 
-        // if there's a "category" query, filter the returned products by the category
-        if(req.query.category){
-            // Obtain the published "products" by category
-            products = await productData.getPublishedProductsByCategory(req.query.category);
-        }else{
-            // Obtain the published "products"
-            products = await productData.getPublishedProducts();
+//add image cloudinary code
+app.post("/products/add", upload.single("featureImage"), function (req, res) {
+  let streamUpload = (req) => {
+    return new Promise((resolve, reject) => {
+      let stream = cloudinary.uploader.upload_stream((error, result) => {
+        if (result) {
+          resolve(result);
+        } else {
+          reject(error);
         }
+      });
 
-        // sort the published products by postDate
-        products.sort((a,b) => new Date(b.postDate) - new Date(a.postDate));
+      streamifier.createReadStream(req.file.buffer).pipe(stream);
+    });
+  };
 
-        // store the "products" and "product" data in the viewData object (to be passed to the view)
-        viewData.products = products;
+  async function upload(req) {
+    let result = await streamUpload(req);
+    console.log(result);
+    return result;
+  }
 
-    }catch(err){
-        viewData.message = "no results";
-    }
+  upload(req).then((uploaded) => {
+    req.body.featureImage = uploaded.url;
+  });
+  productSrv.addProduct(req.body).then(() => {
+    res.redirect("/demos"); //after done redirect to demos
+  });
 
-    try{
-        // Obtain the product by "id"
-        viewData.product = await productData.getProductById(req.params.id);
-    }catch(err){
-        viewData.message = "no results"; 
-    }
-
-    try{
-        // Obtain the full list of "categories"
-        let categories = await productData.getCategories();
-
-        // store the "categories" data in the viewData object (to be passed to the view)
-        viewData.categories = categories;
-    }catch(err){
-        viewData.categoriesMessage = "no results"
-    }
-
-    // render the "product" view with all of the data (viewData)
-    res.render("product", {data: viewData})
-});
-
-app.get('/demos', (req,res)=>{
-
-    let queryPromise = null;
-
-    if(req.query.category){
-        queryPromise = productData.getProductsByCategory(req.query.category);
-    }else if(req.query.minDate){
-        queryPromise = productData.getProductsByMinDate(req.query.minDate);
-    }else{
-        queryPromise = productData.getAllProducts()
-    } 
-
-    queryPromise.then(data=>{
-        res.render("demos", {demos: data})
-    }).catch(err=>{
-        res.render("demos", {message: "no results"});
+  return new Promise((resolve,reject)=>{
+    productSrv.getCategories()
+    .then(function(data){
+      res.render("addProduct", {categories: data});
     })
-
+    .catch(function(err){
+      res.render("addProduct", {categories: []});
+    })
+  });
 });
 
-app.get('/categories', (req,res)=>{
-    productData.getCategories().then((data=>{
-        res.render("categories", {categories: data});
-    })).catch(err=>{
-        res.render("categories", {message: "no results"});
-    });
-});
+app.get("/product", async (req, res) => {
+  // Declare an object to store properties for the view
+  let viewData = {};
 
-app.post("/products/add", upload.single("featureImage"), (req,res)=>{
+  try {
+    // declare an empty array to hold "product" objects
+    let products = [];
 
-    if(req.file){
-        let streamUpload = (req) => {
-            return new Promise((resolve, reject) => {
-                let stream = cloudinary.uploader.upload_stream(
-                    (error, result) => {
-                        if (result) {
-                            resolve(result);
-                        } else {
-                            reject(error);
-                        }
-                    }
-                );
-    
-                streamifier.createReadStream(req.file.buffer).pipe(stream);
-            });
-        };
-    
-        async function upload(req) {
-            let result = await streamUpload(req);
-            console.log(result);
-            return result;
-        }
-    
-        upload(req).then((uploaded)=>{
-            processProduct(uploaded.url);
-        });
-    }else{
-        processProduct("");
+    // if there's a "category" query, filter the returned products by the category
+    if (req.query.category) {
+      // Obtain the published "products" by category
+      products = await productSrv.getPublishedProductsByCategory(
+        req.query.category
+      );
+    } else {
+      // Obtain the published "products"
+      products = await productSrv.getPublishedProducts();
     }
 
-    function processProduct(imageUrl){
-        req.body.featureImage = imageUrl;
+    // sort the published products by the postDate
+    products.sort((a, b) => new Date(b.postDate) - new Date(a.postDate));
 
-        productData.addProduct(req.body).then(product=>{
-            res.redirect("/demos");
-        }).catch(err=>{
-            res.status(500).send(err);
-        })
-    }   
+    // get the latest product from the front of the list (element 0)
+    let product = products[0];
+
+    // store the "products" and "product" data in the viewData object (to be passed to the view)
+    viewData.products = products;
+    viewData.product = product;
+  } catch (err) {
+    viewData.message = "no results";
+  }
+
+  try {
+    // Obtain the full list of "categories"
+    let categories = await productSrv.getCategories();
+
+    // store the "categories" data in the viewData object (to be passed to the view)
+    viewData.categories = categories;
+  } catch (err) {
+    viewData.categoriesMessage = "no results";
+  }
+
+  // render the "product" view with all of the data (viewData)
+  res.render("product", { data: viewData });
 });
 
-app.get('/products/add', (req,res)=>{
-    res.render(path.join(__dirname, "/views/addProduct.hbs"));
-}); 
+//product-id txt
+app.get("/product/:id", async (req, res) => {
+  // Declare an object to store properties for the view
+  let viewData = {};
 
-app.get('/product/:id', (req,res)=>{
-    productData.getProductById(req.params.id).then(data=>{
-        res.json(data);
-    }).catch(err=>{
-        res.json({message: err});
+  try {
+    // declare an empty array to hold "product" objects
+    let products = [];
+
+    // if there's a "category" query, filter the returned products by the category
+    if (req.query.category) {
+      // Obtain the published "products" by category
+      products = await productSrv.getPublishedProductsByCategory(
+        req.query.category
+      );
+    } else {
+      // Obtain the published "products"
+      products = await productSrv.getPublishedProducts();
+    }
+
+    // sort the published products by postDate
+    products.sort((a, b) => new Date(b.postDate) - new Date(a.postDate));
+
+    // store the "products" and "product" data in the viewData object (to be passed to the view)
+    viewData.products = products;
+  } catch (err) {
+    viewData.message = "no results";
+  }
+
+  try {
+    // Obtain the product by "id"
+    viewData.product = await productSrv.getProductById(req.params.id);
+  } catch (err) {
+    viewData.message = "no results";
+  }
+
+  try {
+    // Obtain the full list of "categories"
+    let categories = await productSrv.getCategories();
+
+    // store the "categories" data in the viewData object (to be passed to the view)
+    viewData.categories = categories;
+  } catch (err) {
+    viewData.categoriesMessage = "no results";
+  }
+
+  // render the "product" view with all of the data (viewData)
+  res.render("product", { data: viewData });
+});
+
+//route to products
+app.get("/products", function (req, res) {
+  productSrv
+    .getPublishedProducts()
+    .then(function (data) {
+      res.render("product", { product: data });
+    })
+    .catch(function (err) {
+      res.render({ message: err });
     });
 });
 
+app.get("/demos", (req, res) => {
+  if (req.query.category) {
+    productSrv
+      .getProductByCategory(req.query.category)
+      .then((data) => {
+        res.render("demos", { demos: data });
+      })
+      .catch((err) => {
+        res.render({ message: "no results" });
+      });
+  } else {
+    productSrv
+      .getAllProducts()
+      .then((data) => {
+        res.render("demos", { demos: data });
+      })
+      .catch(function (err) {
+        res.render({ message: err });
+      });
+  }
+});
+//route to categories
+app.get("/categories", function (req, res) {
+  if (req.query.category) {
+    productSrv
+      .getProductByCategory(req.query.category)
+      .then((data) => {
+        res.render("demos", { demos: data });
+      })
+      .catch((err) => {
+        res.render({ message: "no results" });
+      });
+  } else {
+    productSrv
+      .getCategories()
+      .then(function (data) {
+        res.render("categories", { categories: data });
+      })
+      .catch(function (err) {
+        res.render("categories", { message: "no results" });
+      });
+  }
+});
 
-
-
-
-
-app.use((req,res)=>{
-    res.status(404).send("404 - Page Not Found")
-})
-
-productData.initialize().then(()=>{
-    app.listen(HTTP_PORT, () => { 
-        console.log('server listening on: ' + HTTP_PORT); 
+//product id return function
+app.get("/product/:value", function (req, res) {
+  productSrv
+    .getProductById(req.params.value)
+    .then(function (data) {
+      res.render(data);
+    })
+    .catch(function (err) {
+      res.render({ message: err });
     });
-}).catch((err)=>{
-    console.log(err);
-})
+});
+
+app.get("/categories/delete/:id",function(req,res){
+    productSrv
+    .deleteCategoryById(id)
+    .then(function(data){
+      res.redirect("/categories");
+    })
+    .catch(function(err){
+      res.status(500);
+      console.log("Unable to Remove Category / Category not found");
+    });
+});
+
+app.get("/demos/delete/:id",function(req,res){
+  productSrv
+    .deleteProductById(id) 
+    .then(function(data){
+      res.redirect("/demos");
+    })
+    .catch(function(err){
+      res.status(500);
+      console.log("Unable to Remove Category / Category not found");
+    });
+});
+
+//if no route found show Page Not Found
+app.use(function (req, res) {
+  res.status(404).render(path.join(__dirname, "/views/404.hbs"));
+});
+
+app.listen(HTTP_PORT, onHttpStart);
